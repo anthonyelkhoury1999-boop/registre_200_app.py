@@ -4,6 +4,23 @@ from datetime import datetime
 
 st.set_page_config(page_title="Caisse — Retour à 200$", layout="centered")
 
+# --- Protection par mot de passe ---
+if "auth" not in st.session_state:
+    st.session_state.auth = False
+
+if not st.session_state.auth:
+    st.title("Accès protégé")
+    pwd = st.text_input("Mot de passe", type="password")
+
+    if st.button("Se connecter"):
+        if pwd == st.secrets["APP_PASSWORD"]:
+            st.session_state.auth = True
+            st.rerun()
+        else:
+            st.error("Mot de passe incorrect.")
+    st.stop()
+# --- Fin protection ---
+
 # ------------------ CONFIG ------------------
 DENOMS = {
     "Billet 100 $": 10000,
