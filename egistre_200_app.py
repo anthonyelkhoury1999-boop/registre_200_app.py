@@ -16,10 +16,17 @@ DENOMS = {
     "Pièce 0,25 $": 25,
     "Pièce 0,10 $": 10,
     "Pièce 0,05 $": 5,
+    "Rouleau 2 $ (25) — 50 $": 5000,
+    "Rouleau 1 $ (25) — 25 $": 2500,
+    "Rouleau 0,25 $ (40) — 10 $": 1000,
+    "Rouleau 0,10 $ (50) — 5 $": 500,
+    "Rouleau 0,05 $ (40) — 2 $": 200,
 }
 ORDER = [
     "Billet 100 $", "Billet 50 $", "Billet 20 $", "Billet 10 $", "Billet 5 $",
-    "Pièce 2 $", "Pièce 1 $", "Pièce 0,25 $", "Pièce 0,10 $", "Pièce 0,05 $"
+    "Pièce 2 $", "Pièce 1 $", "Pièce 0,25 $", "Pièce 0,10 $", "Pièce 0,05 $",     
+    "Rouleau 2 $ (25) — 50 $", "Rouleau 1 $ (25) — 25 $", "Rouleau 0,25 $ (40) — 10 $",
+    "Rouleau 0,10 $ (50) — 5 $","Rouleau 0,05 $ (40) — 2 $"
 ]
 
 DEFAULT_TARGET = 20000  # 200.00$
