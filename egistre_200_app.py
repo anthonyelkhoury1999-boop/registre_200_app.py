@@ -303,7 +303,7 @@ else:
 
             row = st.columns([2.8, 1.1, 1.1, 1.4, 1.6])
             row[0].write(k)
-            minus = row[1].button("–", key=f"minus_{k}")
+            minus = row[1].button("➖", key=f"minus_{k}")
             plus = row[2].button("➕", key=f"plus_{k}")
             row[3].write(f"RETRAIT: **{q}**")
             row[4].write(f"Dispo: {max_avail}")
