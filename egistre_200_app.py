@@ -291,8 +291,8 @@ else:
         else:
             st.success("RETRAIT total proposé: " + cents_to_str(retrait_total))
 
-        st.subheader("Ajuster le retrait (ATM)")
-        st.caption("Clique –/+ pour verrouiller une dénomination, puis l’app recalcule le reste automatiquement.")
+        st.subheader("Ajuster le retrait")
+        st.caption("Clique –/+ pour ajuster une dénomination, puis l’app recalcule le reste automatiquement.")
 
         for k in ORDER:
             if k not in allowed:
@@ -301,7 +301,7 @@ else:
             q = int(retrait_counts.get(k, 0))
             max_avail = int(close_counts.get(k, 0))
 
-            row = st.columns([2.5, 0.8, 0.8, 1.4, 1.6])
+            row = st.columns([2.8, 1.1, 1.1, 1.4, 1.6])
             row[0].write(k)
             minus = row[1].button("–", key=f"minus_{k}")
             plus = row[2].button("+", key=f"plus_{k}")
