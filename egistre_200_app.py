@@ -499,7 +499,9 @@ if gen:
         f"Caisse #: {register_no}",
         f"Caissier(ère): {cashier_name if cashier_name.strip() else '—'}",
         f"Date/Heure: {dt_str}",
-        now_local = datetime.now(TZ)meta = "Généré le " + now_local.strftime("%Y-%m-%d %H:%M"),
+        now_local = datetime.now(TZ)
+        meta = "Généré le " + now_local.strftime("%Y-%m-%d %H:%M")
+        ,
     ]
 
     st.session_state.report_data = {"rows": rows, "meta_lines": meta_lines}
