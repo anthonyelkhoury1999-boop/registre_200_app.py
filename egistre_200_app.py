@@ -140,7 +140,15 @@ st.header("RETRAIT")
 diff = total_close - TARGET
 st.write("À retirer :", cents_to_str(diff))
 
-allowed = [k for k in ORDER if st.checkbox(k, True, key=f"allow_{k}")]
+st.subheader("Types autorisés pour le retrait")
+
+allowed = []
+a1, a2 = st.columns(2)
+
+for i, k in enumerate(ORDER):
+    with (a1 if i % 2 == 0 else a2):
+        if st.checkbox(k, value=True, key=f"allow_{k}"):
+            allowed.append(k)
 
 st.session_state.locked = clamp_locked(st.session_state.locked, close_counts)
 
