@@ -118,15 +118,23 @@ TARGET = int(st.number_input("Montant cible ($)", value=200, step=10)) * 100
 
 # ---------- OPEN ----------
 st.header("OPEN — Fond de caisse")
-open_counts = {k: st.number_input(k, 0, key=f"open_{k}") for k in ORDER}
-st.info("TOTAL OPEN : " + cents_to_str(total_cents(open_counts)))
+open_counts = {}
+o1, o2 = st.columns(2)
+for i, k in enumerate(ORDER):
+    with (o1 if i % 2 == 0 else o2):
+        open_counts[k] = st.number_input(k, min_value=0, step=1, value=0, key=f"open_{k}")
 
+st.info("TOTAL OPEN : " + cents_to_str(total_cents(open_counts)))
 # ---------- CLOSE ----------
 st.header("CLOSE — Fin de journée")
-close_counts = {k: st.number_input(f"{k} (CLOSE)", 0, key=f"close_{k}") for k in ORDER}
+close_counts = {}
+c1, c2 = st.columns(2)
+for i, k in enumerate(ORDER):
+    with (c1 if i % 2 == 0 else c2):
+        close_counts[k] = st.number_input(f"{k} (CLOSE)", min_value=0, step=1, value=0, key=f"close_{k}")
+
 total_close = total_cents(close_counts)
 st.success("TOTAL CLOSE : " + cents_to_str(total_close))
-
 # ---------- RETRAIT ----------
 st.header("RETRAIT")
 diff = total_close - TARGET
