@@ -90,9 +90,39 @@ def suggest_retrait(diff, allowed, available, locked):
     remaining = take_greedy(remaining, [k for k in ROLLS if k in allowed_set], available, out, locked)
 
     return out, remaining
+    
     def rows_report(open_c, close_c, retrait_c, restant_c):
     rows = []
     t_open = t_close = t_ret = t_res = 0
+
+    for k in ORDER:
+        o = int(open_c.get(k, 0))
+        c = int(close_c.get(k, 0))
+        r = int(retrait_c.get(k, 0))
+        s = int(restant_c.get(k, 0))
+
+        rows.append({
+            "Dénomination": k,
+            "OPEN": o,
+            "CLOSE": c,
+            "RETRAIT": r,
+            "RESTANT": s,
+        })
+
+        t_open += o * DENOMS[k]
+        t_close += c * DENOMS[k]
+        t_ret += r * DENOMS[k]
+        t_res += s * DENOMS[k]
+
+    rows.append({
+        "Dénomination": "TOTAL ($)",
+        "OPEN": f"{t_open / 100:.2f}",
+        "CLOSE": f"{t_close / 100:.2f}",
+        "RETRAIT": f"{t_ret / 100:.2f}",
+        "RESTANT": f"{t_res / 100:.2f}",
+    })
+
+    return rows
 
     for k in ORDER:
         o = int(open_c.get(k, 0))
