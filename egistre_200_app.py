@@ -110,57 +110,72 @@ def _priority_sort(allowed: list) -> list:
     return bills_desc + coins_desc + rolls_desc
 
 
-def fill_greedy_favor_bills_avoid_rolls(target_withdraw_cents: int, allowed: list, available: dict, locked: dict):
+BIG_BILLS = ["Billet 100 $", "Billet 50 $", "Billet 20 $"]
+SMALL_BILLS = ["Billet 10 $", "Billet 5 $"]
+
+def _take_greedy_from_list(remaining: int, keys: list, available: dict, out: dict, locked: dict) -> int:
+    """Take as much as possible from keys (in given order), respecting available + already out + locked keys."""
+    for k in keys:
+        if remaining <= 0:
+            break
+        if k not in out:
+            continue
+        if k in locked:
+            continue
+        v = DENOMS[k]
+        max_can_take = int(available.get(k, 0)) - int(out.get(k, 0))
+        if max_can_take < 0:
+            max_can_take = 0
+        take = min(remaining // v, max_can_take)
+        if take > 0:
+            out[k] += int(take)
+            remaining -= int(take) * v
+    return remaining
+
+
+def fill_prefer_big_bills_coins_last(target_withdraw_cents: int, allowed: list, available: dict, locked: dict):
     """
     OUT pour atteindre target_withdraw_cents.
-    - Démarre avec locked.
-    - Remplit ensuite en favorisant les billets (gros->petit).
-    - Utilise les rouleaux en DERNIER (donc rarement), seulement si nécessaire.
+    Priorités:
+      1) 100/50/20 (gros billets) au max
+      2) 10/5 seulement si nécessaire (rare)
+      3) Pièces seulement pour "finir" le montant (rounding)
+      4) Rouleaux en dernier recours (rarement)
     Retourne: (out_counts, remaining_cents_after)
     """
     out = {k: 0 for k in DENOMS}
 
-    # apply locked
+    # appliquer locked (l'utilisateur force certaines quantités)
     for k, q in locked.items():
         out[k] = int(q)
 
     remaining = target_withdraw_cents - sum(out[k] * DENOMS[k] for k in DENOMS)
     if remaining < 0:
-        return out, remaining  # over-withdraw (locked too high)
+        return out, remaining  # locked trop haut = retrait dépassé
 
     allowed_set = set(allowed)
-    allowed_no_rolls = [k for k in allowed if k not in ROLLS]
-    allowed_rolls = [k for k in allowed if k in ROLLS]
 
-    # Pass 1: no rolls (favor bills then coins)
-    for k in _priority_sort(allowed_no_rolls):
-        if k in locked:
-            continue
-        v = DENOMS[k]
-        max_can_take = int(available.get(k, 0)) - int(out.get(k, 0))
-        if max_can_take < 0:
-            max_can_take = 0
-        take = min(remaining // v, max_can_take)
-        if take > 0:
-            out[k] += int(take)
-            remaining -= int(take) * v
-        if remaining == 0:
-            return out, 0
+    # listes filtrées par "allowed"
+    big_bills = [k for k in BIG_BILLS if k in allowed_set]
+    small_bills = [k for k in SMALL_BILLS if k in allowed_set]
+    coins_desc = [k for k in COINS if k in allowed_set]
+    coins_desc = sorted(coins_desc, key=lambda x: DENOMS[x], reverse=True)  # 2$ -> 0.05
+    rolls_desc = [k for k in ROLLS if k in allowed_set]
+    rolls_desc = sorted(rolls_desc, key=lambda x: DENOMS[x], reverse=True)
 
-    # Pass 2: rolls LAST (only if still needed)
-    for k in _priority_sort(allowed_rolls):
-        if k in locked:
-            continue
-        v = DENOMS[k]
-        max_can_take = int(available.get(k, 0)) - int(out.get(k, 0))
-        if max_can_take < 0:
-            max_can_take = 0
-        take = min(remaining // v, max_can_take)
-        if take > 0:
-            out[k] += int(take)
-            remaining -= int(take) * v
-        if remaining == 0:
-            return out, 0
+    # 1) gros billets d'abord (100, 50, 20)
+    remaining = _take_greedy_from_list(remaining, big_bills, available, out, locked)
+
+    # 2) si encore gros reste, on essaye 10/5, mais "rarement" = seulement si ça aide à descendre
+    #    (ici: greedy normal, mais après les gros billets)
+    remaining = _take_greedy_from_list(remaining, small_bills, available, out, locked)
+
+    # 3) pièces uniquement pour finir (rounding)
+    remaining = _take_greedy_from_list(remaining, coins_desc, available, out, locked)
+
+    # 4) rouleaux seulement en dernier recours
+    if remaining > 0:
+        remaining = _take_greedy_from_list(remaining, rolls_desc, available, out, locked)
 
     return out, remaining
 
