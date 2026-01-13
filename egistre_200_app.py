@@ -1,6 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
-from datetime import datetime
+from datetime import datetime, date, time as dtime
 
 st.set_page_config(page_title="Caisse — Retour à 200$", layout="centered")
 
@@ -28,22 +28,35 @@ DENOMS = {
     "Billet 20 $": 2000,
     "Billet 10 $": 1000,
     "Billet 5 $": 500,
+
     "Pièce 2 $": 200,
     "Pièce 1 $": 100,
     "Pièce 0,25 $": 25,
     "Pièce 0,10 $": 10,
     "Pièce 0,05 $": 5,
+
     "Rouleau 2 $ (25) — 50 $": 5000,
     "Rouleau 1 $ (25) — 25 $": 2500,
     "Rouleau 0,25 $ (40) — 10 $": 1000,
     "Rouleau 0,10 $ (50) — 5 $": 500,
     "Rouleau 0,05 $ (40) — 2 $": 200,
 }
+
 ORDER = [
     "Billet 100 $", "Billet 50 $", "Billet 20 $", "Billet 10 $", "Billet 5 $",
-    "Pièce 2 $", "Pièce 1 $", "Pièce 0,25 $", "Pièce 0,10 $", "Pièce 0,05 $",     
+    "Pièce 2 $", "Pièce 1 $", "Pièce 0,25 $", "Pièce 0,10 $", "Pièce 0,05 $",
     "Rouleau 2 $ (25) — 50 $", "Rouleau 1 $ (25) — 25 $", "Rouleau 0,25 $ (40) — 10 $",
-    "Rouleau 0,10 $ (50) — 5 $","Rouleau 0,05 $ (40) — 2 $"
+    "Rouleau 0,10 $ (50) — 5 $", "Rouleau 0,05 $ (40) — 2 $",
+]
+
+BILLS = ["Billet 100 $", "Billet 50 $", "Billet 20 $", "Billet 10 $", "Billet 5 $"]
+COINS = ["Pièce 2 $", "Pièce 1 $", "Pièce 0,25 $", "Pièce 0,10 $", "Pièce 0,05 $"]
+ROLLS = [
+    "Rouleau 2 $ (25) — 50 $",
+    "Rouleau 1 $ (25) — 25 $",
+    "Rouleau 0,25 $ (40) — 10 $",
+    "Rouleau 0,10 $ (50) — 5 $",
+    "Rouleau 0,05 $ (40) — 2 $",
 ]
 
 DEFAULT_TARGET = 20000  # 200.00$
@@ -52,14 +65,18 @@ DEFAULT_TARGET = 20000  # 200.00$
 def cents_to_str(c: int) -> str:
     return f"{c/100:.2f} $"
 
+
 def total_cents(counts: dict) -> int:
     return sum(int(counts.get(k, 0)) * DENOMS[k] for k in DENOMS)
+
 
 def add_counts(a: dict, b: dict) -> dict:
     return {k: int(a.get(k, 0)) + int(b.get(k, 0)) for k in DENOMS}
 
+
 def sub_counts(a: dict, b: dict) -> dict:
     return {k: int(a.get(k, 0)) - int(b.get(k, 0)) for k in DENOMS}
+
 
 def clamp_locked(locked: dict, max_available: dict) -> dict:
     """Ensure 0 <= locked[k] <= max_available[k] for all locked keys."""
@@ -72,11 +89,34 @@ def clamp_locked(locked: dict, max_available: dict) -> dict:
             out[k] = int(max_available.get(k, 0))
     return out
 
-def fill_greedy(target_withdraw_cents: int, allowed: list, available: dict, locked: dict):
+
+def _priority_sort(allowed: list) -> list:
     """
-    Compute OUT counts to reach exact target_withdraw_cents.
-    Start with locked quantities, then fill the rest greedily.
-    Returns: (out_counts, remaining_cents_after)
+    Favorise les billets (gros->petit), puis les pièces (gros->petit),
+    et met les rouleaux en DERNIER (donc "rarement" utilisés).
+    """
+    allowed_set = set(allowed)
+
+    bills_desc = [k for k in BILLS if k in allowed_set]
+    bills_desc = sorted(bills_desc, key=lambda x: DENOMS[x], reverse=True)
+
+    coins_desc = [k for k in COINS if k in allowed_set]
+    coins_desc = sorted(coins_desc, key=lambda x: DENOMS[x], reverse=True)
+
+    rolls_desc = [k for k in ROLLS if k in allowed_set]
+    rolls_desc = sorted(rolls_desc, key=lambda x: DENOMS[x], reverse=True)
+
+    # Bills first, coins second, rolls last
+    return bills_desc + coins_desc + rolls_desc
+
+
+def fill_greedy_favor_bills_avoid_rolls(target_withdraw_cents: int, allowed: list, available: dict, locked: dict):
+    """
+    OUT pour atteindre target_withdraw_cents.
+    - Démarre avec locked.
+    - Remplit ensuite en favorisant les billets (gros->petit).
+    - Utilise les rouleaux en DERNIER (donc rarement), seulement si nécessaire.
+    Retourne: (out_counts, remaining_cents_after)
     """
     out = {k: 0 for k in DENOMS}
 
@@ -86,10 +126,14 @@ def fill_greedy(target_withdraw_cents: int, allowed: list, available: dict, lock
 
     remaining = target_withdraw_cents - sum(out[k] * DENOMS[k] for k in DENOMS)
     if remaining < 0:
-        return out, remaining  # over-withdraw
+        return out, remaining  # over-withdraw (locked too high)
 
-    allowed_sorted = sorted(allowed, key=lambda x: DENOMS[x], reverse=True)
-    for k in allowed_sorted:
+    allowed_set = set(allowed)
+    allowed_no_rolls = [k for k in allowed if k not in ROLLS]
+    allowed_rolls = [k for k in allowed if k in ROLLS]
+
+    # Pass 1: no rolls (favor bills then coins)
+    for k in _priority_sort(allowed_no_rolls):
         if k in locked:
             continue
         v = DENOMS[k]
@@ -97,14 +141,33 @@ def fill_greedy(target_withdraw_cents: int, allowed: list, available: dict, lock
         if max_can_take < 0:
             max_can_take = 0
         take = min(remaining // v, max_can_take)
-        out[k] += int(take)
-        remaining -= int(take) * v
+        if take > 0:
+            out[k] += int(take)
+            remaining -= int(take) * v
+        if remaining == 0:
+            return out, 0
+
+    # Pass 2: rolls LAST (only if still needed)
+    for k in _priority_sort(allowed_rolls):
+        if k in locked:
+            continue
+        v = DENOMS[k]
+        max_can_take = int(available.get(k, 0)) - int(out.get(k, 0))
+        if max_can_take < 0:
+            max_can_take = 0
+        take = min(remaining // v, max_can_take)
+        if take > 0:
+            out[k] += int(take)
+            remaining -= int(take) * v
+        if remaining == 0:
+            return out, 0
 
     return out, remaining
 
+
 def rows_report(open_c, close_c, retrait_c, restant_c):
     """
-    Table: Dénomination | OPEN | CLOSE | RETRAIT | RESTANT (200)
+    Table: Dénomination | OPEN | CLOSE | RETRAIT | RESTANT (cible)
     plus TOTAL($) row
     """
     rows = []
@@ -136,8 +199,8 @@ def rows_report(open_c, close_c, retrait_c, restant_c):
     })
     return rows
 
-def build_print_html(rows, meta_line: str):
-    # Build table HTML
+
+def build_print_html(rows, meta_lines: list[str]):
     body = ""
     for r in rows:
         body += (
@@ -150,10 +213,12 @@ def build_print_html(rows, meta_line: str):
             "</tr>"
         )
 
+    meta_html = "<br/>".join([f"<div style='opacity:0.75; font-size:12px; margin-top:3px;'>{m}</div>" for m in meta_lines])
+
     report_inner = f"""
       <div>
-        <h2 style="margin:0;">Rapport caisse — Retour à 200$</h2>
-        <div style="opacity:0.75; font-size:12px; margin-top:4px;">{meta_line}</div>
+        <h2 style="margin:0;">Rapport caisse — Retour à la cible</h2>
+        {meta_html}
       </div>
       <div style="height:12px;"></div>
       <table style="width:100%; border-collapse:collapse; font-size:14px; background:#ffffff; color:#000000;"
@@ -164,7 +229,7 @@ def build_print_html(rows, meta_line: str):
             <th>OPEN</th>
             <th>CLOSE</th>
             <th>RETRAIT</th>
-            <th>RESTANT (200$)</th>
+            <th>RESTANT (cible)</th>
           </tr>
         </thead>
         <tbody>
@@ -220,6 +285,7 @@ def build_print_html(rows, meta_line: str):
     """
     return html
 
+
 # ------------------ STATE ------------------
 if "locked_retrait" not in st.session_state:
     st.session_state.locked_retrait = {}
@@ -229,13 +295,30 @@ if "report_data" not in st.session_state:
     st.session_state.report_data = None
 
 # ------------------ UI ------------------
-st.title("Caisse — Calcul retrait pour revenir à 200 $")
-st.caption("Tu comptes CLOSE, l’app propose RETRAIT, tu ajustes (-/+) et tu imprimes le rapport.")
+st.title("Caisse — Calcul retrait pour revenir à la cible")
+st.caption("Tu comptes CLOSE, l’app propose RETRAIT (favorise gros billets), tu ajustes (-/+) et tu imprimes le rapport.")
+
+st.divider()
+
+# ---- Infos caissier / meta ----
+st.header("Infos (pour le rapport)")
+m1, m2, m3, m4 = st.columns([1.6, 1.2, 1.2, 1.2])
+
+with m1:
+    cashier_name = st.text_input("Nom du caissier / caissière", value="", placeholder="Ex: Anthony")
+with m2:
+    register_no = st.selectbox("Caisse #", options=[1, 2, 3], index=0)
+with m3:
+    rep_date = st.date_input("Date", value=date.today())
+with m4:
+    rep_time = st.time_input("Heure", value=datetime.now().time().replace(second=0, microsecond=0))
+
+weather = st.text_input("Météo (optionnel)", value="", placeholder="Ex: Neige, -10°C / Pluie / Soleil...")
+
+st.divider()
 
 target = st.number_input("Montant cible à laisser dans la caisse ($)", min_value=0, step=10, value=200)
 TARGET = int(target) * 100
-
-st.divider()
 
 # 1) OPEN
 st.header("1) OPEN — Fond de caisse (matin)")
@@ -265,18 +348,16 @@ st.divider()
 
 # 3) RETRAIT suggestion
 st.header("3) RETRAIT — Pour revenir à la cible")
-
 diff = total_close - TARGET  # amount to remove to reach target
 st.write("Cible: **" + cents_to_str(TARGET) + "**")
 st.write("Écart (CLOSE - cible): **" + cents_to_str(diff) + "**")
 
 if diff < 0:
     st.warning("La caisse est en dessous de la cible. Ici il faudrait AJOUTER de l’argent, pas retirer.")
-    # Still allow a report, but retrait will be 0
     retrait_counts = {k: 0 for k in DENOMS}
     restant_counts = close_counts
 else:
-    st.caption("Choisis les types autorisés pour le retrait (ex: seulement billets, ou billets + pièces).")
+    st.caption("Choisis les types autorisés pour le retrait. (L’algo favorise billets, rouleaux en dernier.)")
     allowed = []
     a1, a2 = st.columns(2)
     for i, k in enumerate(ORDER):
@@ -288,9 +369,11 @@ else:
     with col_btns[0]:
         if st.button("PROPOSER RETRAIT"):
             st.session_state.locked_retrait = {}
+            st.rerun()
     with col_btns[1]:
         if st.button("RÉINITIALISER AJUSTEMENTS"):
             st.session_state.locked_retrait = {}
+            st.rerun()
 
     # clamp locked based on availability = close_counts
     st.session_state.locked_retrait = clamp_locked(st.session_state.locked_retrait, close_counts)
@@ -300,7 +383,7 @@ else:
         retrait_counts = {k: 0 for k in DENOMS}
         restant_counts = close_counts
     else:
-        retrait_counts, remaining_after = fill_greedy(
+        retrait_counts, remaining_after = fill_greedy_favor_bills_avoid_rolls(
             target_withdraw_cents=diff,
             allowed=allowed,
             available=close_counts,
@@ -309,14 +392,18 @@ else:
 
         retrait_total = total_cents(retrait_counts)
 
+        # IMPORTANT: on ne bloque pas — warning si pas exact
         if remaining_after != 0:
-            st.error("Impossible de faire un retrait EXACT avec les types autorisés + la disponibilité.")
-            st.write("Montant restant non couvert: **" + cents_to_str(remaining_after) + "**")
+            st.warning(
+                "Impossible de faire un retrait EXACT avec les types autorisés + la disponibilité.\n\n"
+                f"Montant restant non couvert: **{cents_to_str(remaining_after)}**"
+            )
+            st.write("RETRAIT total actuel: **" + cents_to_str(retrait_total) + "**")
         else:
             st.success("RETRAIT total proposé: " + cents_to_str(retrait_total))
 
         st.subheader("Ajuster le retrait")
-        st.caption("Clique –/+ pour ajuster une dénomination, puis l’app recalcule le reste automatiquement.")
+        st.caption("Clique ➖/➕ pour verrouiller une dénomination, puis l’app recalcule le reste automatiquement.")
 
         for k in ORDER:
             if k not in allowed:
@@ -360,7 +447,7 @@ else:
         st.header("4) RESTANT — Ce qui reste dans la caisse (devrait = cible)")
         st.info("RESTANT total: " + cents_to_str(restant_total))
 
-        if restant_total != TARGET and diff >= 0:
+        if restant_total != TARGET:
             st.warning("⚠️ Le restant n’est pas égal à la cible. Ajuste le retrait ou autorise d’autres types.")
         else:
             st.success("✅ Restant = cible")
@@ -381,7 +468,6 @@ if clear:
     st.session_state.report_data = None
 
 if gen:
-    # build report snapshot
     if diff >= 0:
         retrait_counts_final = retrait_counts if "retrait_counts" in locals() else {k: 0 for k in DENOMS}
         restant_counts_final = restant_counts if "restant_counts" in locals() else close_counts
@@ -390,11 +476,20 @@ if gen:
         restant_counts_final = close_counts
 
     rows = rows_report(open_counts, close_counts, retrait_counts_final, restant_counts_final)
-    meta = "Généré le " + datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    st.session_state.report_data = {"rows": rows, "meta": meta}
+    # meta lines
+    dt_str = f"{rep_date.isoformat()} {rep_time.strftime('%H:%M')}"
+    meta_lines = [
+        f"Caisse #: {register_no}",
+        f"Caissier(ère): {cashier_name if cashier_name.strip() else '—'}",
+        f"Date/Heure: {dt_str}",
+        f"Météo: {weather if weather.strip() else '—'}",
+        "Généré le " + datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ]
+
+    st.session_state.report_data = {"rows": rows, "meta_lines": meta_lines}
     st.session_state.show_report = True
 
 if st.session_state.show_report and st.session_state.report_data:
-    html = build_print_html(st.session_state.report_data["rows"], st.session_state.report_data["meta"])
+    html = build_print_html(st.session_state.report_data["rows"], st.session_state.report_data["meta_lines"])
     components.html(html, height=560, scrolling=True)
