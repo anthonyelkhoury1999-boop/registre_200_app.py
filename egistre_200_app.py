@@ -496,7 +496,6 @@ if gen:
         f"Caisse #: {register_no}",
         f"Caissier(ère): {cashier_name if cashier_name.strip() else '—'}",
         f"Date/Heure: {dt_str}",
-        f"Météo: {weather if weather.strip() else '—'}",
         "Généré le " + datetime.now().strftime("%Y-%m-%d %H:%M"),
     ]
 
