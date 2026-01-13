@@ -90,6 +90,125 @@ def suggest_retrait(diff, allowed, available, locked):
     remaining = take_greedy(remaining, [k for k in ROLLS if k in allowed_set], available, out, locked)
 
     return out, remaining
+    def rows_report(open_c, close_c, retrait_c, restant_c):
+    rows = []
+    t_open = t_close = t_ret = t_res = 0
+
+    for k in ORDER:
+        o = int(open_c.get(k, 0))
+        c = int(close_c.get(k, 0))
+        r = int(retrait_c.get(k, 0))
+        s = int(restant_c.get(k, 0))
+
+        rows.append({
+            "Dénomination": k,
+            "OPEN": o,
+            "CLOSE": c,
+            "RETRAIT": r,
+            "RESTANT": s
+        })
+
+        t_open += o * DENOMS[k]
+        t_close += c * DENOMS[k]
+        t_ret += r * DENOMS[k]
+        t_res += s * DENOMS[k]
+
+    rows.append({
+        "Dénomination": "TOTAL ($)",
+        "OPEN": f"{t_open/100:.2f}",
+        "CLOSE": f"{t_close/100:.2f}",
+        "RETRAIT": f"{t_ret/100:.2f}",
+        "RESTANT": f"{t_res/100:.2f}",
+    })
+    return rows
+
+
+def build_print_html(rows, meta_lines):
+    body = ""
+    for r in rows:
+        body += (
+            "<tr>"
+            f"<td>{r['Dénomination']}</td>"
+            f"<td style='text-align:center'>{r['OPEN']}</td>"
+            f"<td style='text-align:center'>{r['CLOSE']}</td>"
+            f"<td style='text-align:center'>{r['RETRAIT']}</td>"
+            f"<td style='text-align:center'>{r['RESTANT']}</td>"
+            "</tr>"
+        )
+
+    meta_html = "".join(
+        [f"<div style='opacity:0.75; font-size:12px; margin-top:3px;'>{m}</div>" for m in meta_lines]
+    )
+
+    report_inner = f"""
+      <div>
+        <h2 style="margin:0;">Rapport caisse — Retour à la cible</h2>
+        {meta_html}
+      </div>
+      <div style="height:12px;"></div>
+      <table style="width:100%; border-collapse:collapse; font-size:14px; background:#ffffff; color:#000000;"
+             border="1" cellpadding="6" cellspacing="0">
+        <thead>
+          <tr style="background:#f3f3f3; color:#000;">
+            <th>Dénomination</th>
+            <th>OPEN</th>
+            <th>CLOSE</th>
+            <th>RETRAIT</th>
+            <th>RESTANT</th>
+          </tr>
+        </thead>
+        <tbody>
+          {body}
+        </tbody>
+      </table>
+    """
+    report_inner_js = report_inner.replace("`", "\\`")
+
+    html = f"""
+    <div style="font-family: Arial, sans-serif;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <div>
+          <h3 style="margin:0;">Aperçu du rapport</h3>
+          <div style="opacity:0.7; font-size:12px;">Imprime seulement le tableau.</div>
+        </div>
+        <button id="print-btn" style="
+          padding:10px 14px;
+          border-radius:10px;
+          border:1px solid #ccc;
+          cursor:pointer;
+          font-weight:600;
+          background:white;
+        ">🖨️ Imprimer le rapport</button>
+      </div>
+
+      <div style="height:10px;"></div>
+      <div id="report">{report_inner}</div>
+    </div>
+
+    <script>
+      function printOnlyReport() {{
+        var reportHtml = `{report_inner_js}`;
+        var w = window.open('', '_blank', 'width=900,height=700');
+        w.document.open();
+        w.document.write('<html><head><title>Rapport caisse</title>');
+        w.document.write('<style>');
+        w.document.write('body{{font-family:Arial,sans-serif;padding:18px;background:#fff;color:#000;}}');
+        w.document.write('table{{width:100%;border-collapse:collapse;}}');
+        w.document.write('th,td{{border:1px solid #000;padding:6px;}}');
+        w.document.write('th{{background:#f3f3f3;}}');
+        w.document.write('</style>');
+        w.document.write('</head><body>');
+        w.document.write(reportHtml);
+        w.document.write('</body></html>');
+        w.document.close();
+        w.focus();
+        w.print();
+      }}
+      const btn = document.getElementById('print-btn');
+      if (btn) btn.addEventListener('click', printOnlyReport);
+    </script>
+    """
+    return html
 
 # ================== STATE ==================
 if "locked" not in st.session_state:
