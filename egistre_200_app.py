@@ -396,12 +396,12 @@ else:
         retrait_counts = {k: 0 for k in DENOMS}
         restant_counts = close_counts
     else:
-        retrait_counts, remaining_after = fill_greedy_favor_bills_avoid_rolls(
-            target_withdraw_cents=diff,
-            allowed=allowed,
-            available=close_counts,
-            locked=st.session_state.locked_retrait
-        )
+        retrait_counts, remaining_after = fill_prefer_big_bills_coins_last(
+    target_withdraw_cents=diff,
+    allowed=allowed,
+    available=close_counts,
+    locked=st.session_state.locked_retrait
+)
 
         retrait_total = total_cents(retrait_counts)
 
