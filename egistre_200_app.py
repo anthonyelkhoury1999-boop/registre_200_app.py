@@ -313,8 +313,6 @@ with m3:
 with m4:
     rep_time = st.time_input("Heure", value=datetime.now().time().replace(second=0, microsecond=0))
 
-weather = st.text_input("Météo (optionnel)", value="", placeholder="Ex: Neige, -10°C / Pluie / Soleil...")
-
 st.divider()
 
 target = st.number_input("Montant cible à laisser dans la caisse ($)", min_value=0, step=10, value=200)
