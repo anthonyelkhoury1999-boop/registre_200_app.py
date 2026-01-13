@@ -22,6 +22,9 @@ if not st.session_state.auth:
 # --- Fin protection ---
 
 # ------------------ CONFIG ------------------
+from zoneinfo import ZoneInfo
+TZ = ZoneInfo("America/Toronto")
+
 DENOMS = {
     "Billet 100 $": 10000,
     "Billet 50 $": 5000,
@@ -496,7 +499,7 @@ if gen:
         f"Caisse #: {register_no}",
         f"Caissier(ère): {cashier_name if cashier_name.strip() else '—'}",
         f"Date/Heure: {dt_str}",
-        "Généré le " + datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "Généré le " + now_local = datetime.now(TZ).strftime("%Y-%m-%d %H:%M"),
     ]
 
     st.session_state.report_data = {"rows": rows, "meta_lines": meta_lines}
